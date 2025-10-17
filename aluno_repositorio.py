@@ -1,65 +1,67 @@
+# aluno_repository.py
+
 from typing import Any, List, Optional, Tuple
-# Importamos apenas a função de conexão, sem saber como ela funciona internamente
-from db_connector import get_connection 
+from pathlib import Path
+from db_connector import get_connection, DEFAULT_DB_FILE, Connection
 
-
-# Definimos o formato de dados esperado para leitura.
-
+# Tipo que representa os dados do aluno: (id, nome, serie, nota)
 AlunoData = Tuple[int, str, int, float] 
 TABLE_NAME = 'alunos'
 
 class AlunoRepository:
     """
-    Encapsula as operações de CRUD (Create, Read, Update, Delete) diretamente sobre
-    a tabela 'alunos'. Esta classe NÃO deve conter (validações).
+    Essa classe só cuida de conversar com o banco de dados.
+    É tipo o tradutor entre nosso código Python e o SQLite.
     """
-    def __init__(self):
+    def __init__(self, db_file: str | Path = DEFAULT_DB_FILE):
+        # Guarda qual arquivo de banco vamos usar (ou ':memory:' pra testes)
+        self._db_file = db_file 
 
-        pass 
+    def _get_connection(self) -> Connection:
+        """Pega uma conexão pro banco que configuramos."""
+        return get_connection(self._db_file)
 
     def create_table(self):
-        """Cria a tabela de alunos se ela não existir."""
-        # O 'with' garante que a conexão será fechada após a operação.
-        with get_connection() as con: 
+        """Cria a tabela dos alunos se ainda não existir."""
+        with self._get_connection() as con: 
             con.execute(
                 f'CREATE TABLE IF NOT EXISTS {TABLE_NAME}'
                 '(id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, serie INTEGER, nota REAL)')
-            con.commit() # É crucial commitar DDL (Data Definition Language)
+            con.commit() 
 
     def insert_aluno(self, nome: str, serie: int, nota: float) -> int:
-        """Insere um novo aluno e retorna o ID gerado."""
+        """Adiciona um aluno novo no banco e devolve o ID que foi criado."""
         query = f'INSERT INTO {TABLE_NAME} (nome, serie, nota) VALUES (?, ?, ?)'
-        with get_connection() as con:
+        with self._get_connection() as con:
             con.execute(query, (nome, serie, nota))
             con.commit() 
-            # Retorna o ID para o Service poder usar em confirmações ou testes.
+            # Pega o ID que o banco acabou de gerar
             return con.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     def select_one(self, aluno_id: int) -> Optional[AlunoData]:
-        """Busca um aluno pelo ID."""
+        """Procura um aluno específico pelo ID."""
         query = f'SELECT * FROM {TABLE_NAME} WHERE id = ?'
-        with get_connection() as con:
+        with self._get_connection() as con:
             cur = con.execute(query, (aluno_id,))
             return cur.fetchone()
 
-    def delete_aluno(self, aluno_id: int) -> None:
-        """Remove um aluno pelo ID."""
-        query = f'DELETE FROM {TABLE_NAME} WHERE id = ?'
-        with get_connection() as con:
-            con.execute(query, (aluno_id,))
-            con.commit() # DML (Data Manipulation Language)
-
-    def update_aluno_nota(self, aluno_id: int, nova_nota: float) -> None:
-        """Atualiza a nota de um aluno específico."""
-        query = f'UPDATE {TABLE_NAME} SET nota = ? WHERE id = ?'
-        with get_connection() as con:
-            con.execute(query, (nova_nota, aluno_id))
-            con.commit()
-
-
     def select_all(self) -> List[AlunoData]:
-        """Retorna todos os registros de alunos."""
+        """Pega todos os alunos que estão no banco."""
         query = f'SELECT * FROM {TABLE_NAME}'
-        with get_connection() as con:
+        with self._get_connection() as con:
             cur = con.execute(query)
             return cur.fetchall()
+
+    def delete_aluno(self, aluno_id: int) -> None:
+        """Apaga um aluno do banco."""
+        query = f'DELETE FROM {TABLE_NAME} WHERE id = ?'
+        with self._get_connection() as con:
+            con.execute(query, (aluno_id,))
+            con.commit() 
+
+    def update_aluno_nota(self, aluno_id: int, nova_nota: float) -> None:
+        """Muda só a nota de um aluno."""
+        query = f'UPDATE {TABLE_NAME} SET nota = ? WHERE id = ?'
+        with self._get_connection() as con:
+            con.execute(query, (nova_nota, aluno_id))
+            con.commit()

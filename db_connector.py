@@ -1,12 +1,22 @@
+# db_connector.py
+
 from pathlib import Path
 import sqlite3
-from typing import Any, List, Optional, Tuple
+from sqlite3 import Connection
 
-# Configurações de Banco de Dados (variáveis globais aqui são aceitáveis para a demo)
+# Configuração do banco - onde fica o arquivo por padrão
 ROOT_DIR = Path(__file__).parent
-DB_NAME = 'my_db.sqlite3'
-DB_FILE = ROOT_DIR / DB_NAME
+DEFAULT_DB_NAME = 'my_db.sqlite3'
+DEFAULT_DB_FILE = ROOT_DIR / DEFAULT_DB_NAME
 
-def get_connection() -> sqlite3.Connection:
-    """Função de fábrica para obter uma nova conexão de banco de dados."""
-    return sqlite3.connect(DB_FILE)
+def get_connection(db_file: str | Path = DEFAULT_DB_FILE) -> Connection:
+    """
+    Cria uma conexão com o SQLite.
+    
+    Pode ser um arquivo real no disco ou ':memory:' pra usar só na RAM 
+    (super útil quando você quer rodar testes sem bagunçar o banco real).
+    """
+    if isinstance(db_file, Path):
+        db_file = str(db_file)
+        
+    return sqlite3.connect(db_file)
